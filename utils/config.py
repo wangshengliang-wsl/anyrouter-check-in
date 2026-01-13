@@ -152,6 +152,56 @@ class AccountConfig:
 		"""获取显示名称"""
 		return self.name if self.name else f'Account {index + 1}'
 
+	def to_dict(self) -> dict:
+		"""转换为字典格式（用于保存到 secret）"""
+		result = {
+			'cookies': self.cookies if isinstance(self.cookies, dict) else {'session': self.cookies},
+			'api_user': self.api_user,
+		}
+		if self.provider != 'anyrouter':
+			result['provider'] = self.provider
+		if self.name:
+			result['name'] = self.name
+		return result
+
+
+@dataclass
+class CredentialConfig:
+	"""账号凭证配置（用于自动登录）"""
+
+	username: str
+	password: str
+	api_user: str
+	provider: str = 'anyrouter'
+	name: str | None = None
+
+	@classmethod
+	def from_dict(cls, data: dict, index: int) -> 'CredentialConfig':
+		"""从字典创建 CredentialConfig"""
+		provider = data.get('provider', 'anyrouter')
+		name = data.get('name', f'Account {index + 1}')
+
+		return cls(
+			username=data['username'],
+			password=data['password'],
+			api_user=data['api_user'],
+			provider=provider,
+			name=name if name else None,
+		)
+
+	def get_display_name(self, index: int) -> str:
+		"""获取显示名称"""
+		return self.name if self.name else f'Account {index + 1}'
+
+	def to_account_config(self, session: str) -> AccountConfig:
+		"""使用新 session 创建 AccountConfig"""
+		return AccountConfig(
+			cookies={'session': session},
+			api_user=self.api_user,
+			provider=self.provider,
+			name=self.name,
+		)
+
 
 def load_accounts_config() -> list[AccountConfig] | None:
 	"""从环境变量加载账号配置"""
@@ -186,4 +236,38 @@ def load_accounts_config() -> list[AccountConfig] | None:
 		return accounts
 	except Exception as e:
 		print(f'ERROR: Account configuration format is incorrect: {e}')
+		return None
+
+
+def load_credentials_config() -> list[CredentialConfig] | None:
+	"""从环境变量加载账号凭证配置（用于自动登录）"""
+	credentials_str = os.getenv('ANYROUTER_CREDENTIALS')
+	if not credentials_str:
+		print('ERROR: ANYROUTER_CREDENTIALS environment variable not found')
+		return None
+
+	try:
+		credentials_data = json.loads(credentials_str)
+
+		if not isinstance(credentials_data, list):
+			print('ERROR: Credentials configuration must use array format [{}]')
+			return None
+
+		credentials = []
+		for i, cred_dict in enumerate(credentials_data):
+			if not isinstance(cred_dict, dict):
+				print(f'ERROR: Credential {i + 1} configuration format is incorrect')
+				return None
+
+			required_fields = ['username', 'password', 'api_user']
+			for field in required_fields:
+				if field not in cred_dict:
+					print(f'ERROR: Credential {i + 1} missing required field: {field}')
+					return None
+
+			credentials.append(CredentialConfig.from_dict(cred_dict, i))
+
+		return credentials
+	except Exception as e:
+		print(f'ERROR: Credentials configuration format is incorrect: {e}')
 		return None
