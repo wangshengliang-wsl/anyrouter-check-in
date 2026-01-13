@@ -105,7 +105,7 @@ jobs:
 
     - name: 刷新 Session（签到失败时或强制刷新）
       id: refresh
-      if: (steps.checkin.outcome == 'failure' || inputs.force_refresh == 'true') && secrets.ANYROUTER_CREDENTIALS != ''
+      if: steps.checkin.outcome == 'failure' || inputs.force_refresh == 'true'
       env:
         ANYROUTER_CREDENTIALS: ${{ secrets.ANYROUTER_CREDENTIALS }}
         PROVIDERS: ${{ secrets.PROVIDERS }}
